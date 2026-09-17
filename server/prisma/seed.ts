@@ -1,0 +1,10 @@
+import 'dotenv/config'; import {PrismaClient, Role, AppointmentStatus} from '@prisma/client'; import bcrypt from 'bcryptjs'; import {DateTime} from 'luxon';
+const db=new PrismaClient(); const tz=process.env.CLINIC_TIMEZONE||'Asia/Kolkata';
+async function main(){const adminEmail=(process.env.DEMO_ADMIN_EMAIL||'admin@auriga.demo').toLowerCase(), recEmail=(process.env.DEMO_RECEPTIONIST_EMAIL||'reception@auriga.demo').toLowerCase(); const hash=async(p:string)=>bcrypt.hash(p,12);
+ await db.user.upsert({where:{email:adminEmail},update:{},create:{name:'Demo Administrator',email:adminEmail,passwordHash:await hash(process.env.DEMO_ADMIN_PASSWORD||'DemoAdmin123!'),role:Role.ADMIN}});
+ await db.user.upsert({where:{email:recEmail},update:{},create:{name:'Demo Receptionist',email:recEmail,passwordHash:await hash(process.env.DEMO_RECEPTIONIST_PASSWORD||'DemoReception123!'),role:Role.RECEPTIONIST}});
+ await db.clinicSettings.upsert({where:{id:1},update:{},create:{id:1,timezone:tz,clinicDayStart:process.env.CLINIC_DAY_START||'09:00',clinicDayEnd:process.env.CLINIC_DAY_END||'18:00'}});
+ const doctors=await Promise.all([['Dr. Ananya Sharma','General Physician'],['Dr. Rohan Verma','Dentist'],['Dr. Neha Mehta','Pediatrician'],['Dr. Arjun Kapoor','Dermatologist']].map(([name,specialization])=>db.doctor.upsert({where:{id:name},update:{},create:{id:name,name,specialization}})));
+ const patients=await Promise.all([['Rahul Kumar','+919000000001','rahul@example.test'],['Priya Nair','+919000000002','priya@example.test'],['Amit Singh','+919000000003',null]].map(([name,phone,email])=>db.patient.upsert({where:{phone},update:{},create:{name,phone,email}})));
+ const start=DateTime.now().setZone(tz).plus({days:1}).startOf('day').set({hour:10}).toUTC().toJSDate(); const end=DateTime.fromJSDate(start).plus({minutes:30}).toJSDate(); await db.appointment.upsert({where:{id:'demo-appointment-1'},update:{},create:{id:'demo-appointment-1',doctorId:doctors[0].id,patientId:patients[0].id,startAt:start,endAt:end,status:AppointmentStatus.CONFIRMED}}); }
+main().then(()=>db.$disconnect()).catch(e=>{console.error(e);db.$disconnect();process.exit(1)});

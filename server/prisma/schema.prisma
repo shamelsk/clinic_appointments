@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  ADMIN
+  RECEPTIONIST
+}
+enum AppointmentStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+enum NotificationType {
+  APPOINTMENT_REMINDER
+}
+model User {
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  passwordHash String
+  role Role @default(RECEPTIONIST)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Doctor {
+  id String @id @default(cuid())
+  name String
+  specialization String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  appointments Appointment[]
+}
+model Patient {
+  id String @id @default(cuid())
+  name String
+  phone String @unique
+  email String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  appointments Appointment[]
+  notifications NotificationOutbox[]
+  @@index([name])
+  @@index([phone])
+}
+model Appointment {
+  id String @id @default(cuid())
+  doctorId String
+  patientId String
+  startAt DateTime
+  endAt DateTime
+  status AppointmentStatus @default(CONFIRMED)
+  cancellationFee Int @default(0)
+  cancelledAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctor Doctor @relation(fields:[doctorId],references:[id],onDelete:Restrict)
+  patient Patient @relation(fields:[patientId],references:[id],onDelete:Restrict)
+  notifications NotificationOutbox[]
+  @@index([doctorId,startAt])
+  @@index([startAt])
+  @@index([status])
+}
+model ClinicSettings {
+  id Int @id @default(1)
+  cancellationWindowMinutes Int @default(120)
+  lateCancellationFee Int @default(100)
+  timezone String @default("Asia/Kolkata")
+  clinicDayStart String @default("09:00")
+  clinicDayEnd String @default("18:00")
+  updatedAt DateTime @updatedAt
+}
+model NotificationOutbox {
+  id String @id @default(cuid())
+  type NotificationType
+  appointmentId String?
+  patientId String?
+  payload Json
+  dedupeKey String @unique
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+  appointment Appointment? @relation(fields:[appointmentId],references:[id],onDelete:SetNull)
+  patient Patient? @relation(fields:[patientId],references:[id],onDelete:SetNull)
+  @@index([appointmentId])
+  @@index([patientId])
+}

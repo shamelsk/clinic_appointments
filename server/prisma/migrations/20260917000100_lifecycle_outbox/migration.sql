@@ -1,0 +1,10 @@
+ALTER TYPE "AppointmentStatus" ADD VALUE IF NOT EXISTS 'COMPLETED';
+ALTER TYPE "AppointmentStatus" ADD VALUE IF NOT EXISTS 'NO_SHOW';
+ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMPTZ;
+CREATE TYPE "NotificationType" AS ENUM ('APPOINTMENT_REMINDER');
+CREATE TABLE "NotificationOutbox" ("id" TEXT NOT NULL,"type" "NotificationType" NOT NULL,"appointmentId" TEXT,"patientId" TEXT,"payload" JSONB NOT NULL,"dedupeKey" TEXT NOT NULL,"createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,"processedAt" TIMESTAMPTZ,CONSTRAINT "NotificationOutbox_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "NotificationOutbox_dedupeKey_key" ON "NotificationOutbox"("dedupeKey");
+CREATE INDEX "NotificationOutbox_appointmentId_idx" ON "NotificationOutbox"("appointmentId");
+CREATE INDEX "NotificationOutbox_patientId_idx" ON "NotificationOutbox"("patientId");
+ALTER TABLE "NotificationOutbox" ADD CONSTRAINT "NotificationOutbox_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "NotificationOutbox" ADD CONSTRAINT "NotificationOutbox_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE SET NULL ON UPDATE CASCADE;
