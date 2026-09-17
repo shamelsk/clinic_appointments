@@ -1,3 +1,5 @@
+ALTER TABLE "Appointment" DROP CONSTRAINT IF EXISTS appointment_no_confirmed_overlap;
+
 -- AlterTable
 ALTER TABLE "Appointment" ALTER COLUMN "startAt" SET DATA TYPE TIMESTAMP(3),
 ALTER COLUMN "endAt" SET DATA TYPE TIMESTAMP(3),
@@ -27,3 +29,7 @@ ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMP(3);
 
 -- CreateIndex
 CREATE INDEX "Patient_phone_idx" ON "Patient"("phone");
+
+ALTER TABLE "Appointment" ADD CONSTRAINT appointment_no_confirmed_overlap
+EXCLUDE USING gist ("doctorId" WITH =, tsrange("startAt", "endAt", '[)') WITH &&)
+WHERE ("status" = 'CONFIRMED');

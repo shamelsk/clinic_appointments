@@ -9,25 +9,26 @@ React/TypeScript/Vite client, Express/TypeScript API, PostgreSQL + Prisma. `clie
 
 ## Setup
 
-Requires Node **20.19+** (Node 22 recommended), npm, and Docker Desktop.
+Requires Node **20.19+** (Node 22 recommended), pnpm 11, and Docker.
 
-```powershell
+```bash
 git clone git@github.com:shamelsk/clinic_appointments.git
 cd clinic_appointments
-Copy-Item .env.example .env
+cp .env.example .env
 docker compose up -d
-npm install
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm run dev
+pnpm install
+pnpm run db:generate
+pnpm run db:validate
+pnpm run db:migrate
+pnpm run db:seed
+pnpm run dev
 ```
 
 Open `http://localhost:5173`; Vite proxies `/api` to Express on 4000. Variables: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `PORT`, `CLINIC_TIMEZONE`, `CLINIC_DAY_START`, `CLINIC_DAY_END`, `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD`, `DEMO_RECEPTIONIST_EMAIL`, `DEMO_RECEPTIONIST_PASSWORD`. Use a strong unique JWT secret outside local development.
 
 ## Scripts
 
-`npm run dev`, `build`, `start`, `test`, `lint`, `typecheck`, `db:generate`, `db:migrate`, `db:migrate:deploy`, and `db:seed`. `docker compose down` stops PostgreSQL while retaining data.
+`pnpm run dev`, `build`, `start`, `test`, `lint`, `typecheck`, `db:generate`, `db:validate`, `db:migrate`, `db:migrate:deploy`, and `db:seed`. `docker compose down` stops PostgreSQL while retaining data.
 
 ## Rules and roles
 
@@ -63,14 +64,14 @@ Lists use PostgreSQL pagination and return `{items,pagination:{page,pageSize,tot
 
 ## Testing, debugging and deployment
 
-Run `npm test` after migrations; integration tests cover auth, role boundaries, booking rules including concurrent booking, cancellation state/fee, admin updates and case-insensitive search. `npm run build` creates production bundles. Debug API with `npm run dev -w server`; inspect DB with `npx prisma studio --schema server/prisma/schema.prisma`.
+Run `pnpm test` after migrations; integration tests cover auth, role boundaries, booking rules including concurrent booking, cancellation state/fee, admin updates and case-insensitive search. `pnpm run build` creates production bundles. Debug API with `pnpm --filter @clinic/server dev`; inspect DB with `pnpm --filter @clinic/server exec prisma studio`.
 
-For Render, provision PostgreSQL and one Node web service, set the variables above, use `npm ci && npm run build` as build command and `npm run db:migrate:deploy && npm start` as start command. The API binds `0.0.0.0` and `process.env.PORT`. CI runs migration, typecheck, lint, tests and build with PostgreSQL. Do not commit `.env` or secrets.
+For Render, provision PostgreSQL and one Node web service, set the variables above, use `pnpm install --frozen-lockfile && pnpm run build` as build command and `pnpm run db:migrate:deploy && pnpm start` as start command. The API binds `0.0.0.0` and `process.env.PORT`. CI runs migration, typecheck, lint, tests and build with PostgreSQL. Do not commit `.env` or secrets.
 
-Future candidates: automated reminders, rescheduling/waitlists, and multi-clinic support. Repository: [shamelsk/clinic_appointments](https://github.com/shamelsk/clinic_appointments).
+Future candidates: waitlists and multi-clinic support. Repository: [shamelsk/clinic_appointments](https://github.com/shamelsk/clinic_appointments).
 
 ## Lifecycle automation
 
 Confirmed appointments can be rescheduled with `POST /api/appointments/:appointmentId/reschedule` (`{startAt}`), retaining their ID, patient and doctor; the new interval receives the same database conflict protection. `POST /api/appointments/:appointmentId/complete` marks a confirmed appointment completed. Completed, cancelled and no-show appointments cannot be rescheduled or normally cancelled.
 
-`POST /clock` (also `/api/clock`) accepts `{now}` or `{at}` as an ISO timestamp and runs deterministic jobs: at or after the local `clinicDayStart`, one reminder is persisted for every still-confirmed appointment today; at scheduled end time, confirmed appointments become `NO_SHOW`. `GET /outbox` (also `/api/outbox`) exposes the persisted reminder records. Each reminder’s `REMINDER:<appointment-id>:<local-date>` key prevents duplicates across repeated clock calls.
+`POST /clock` (also `/api/clock`) accepts `{now}` or `{at}` as an ISO timestamp and runs deterministic jobs: overdue confirmed appointments become `NO_SHOW` first, then at or after the local `clinicDayStart`, one reminder is persisted for every remaining confirmed appointment today. `GET /outbox` (also `/api/outbox`) exposes the persisted reminder records. Each reminder’s `REMINDER:<appointment-id>:<local-date>` key prevents duplicates across repeated clock calls.
